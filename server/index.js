@@ -1,53 +1,51 @@
 const express = require("express");
+const sqlite3 = require("sqlite3").verbose();
 const cors = require("cors");
-const { spawn } = require("child_process");
 const path = require("path");
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 5000;
-
-app.get("/", (req, res) => {
-  res.json({ message: "Witaj w TransferRoomAI! Serwer działa poprawnie." });
+const dbPath = path.resolve(__dirname, "football_data.db");
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error("Error opening database:", err.message);
+  } else {
+    console.log("Connected to the SQLite database.");
+  }
 });
 
-app.get("/api/test-python", (req, res) => {
-  const team = req.query.team || "default_team";
-  const year = req.query.year || "2024";
+app.get("/", (req, res) => {
+  res.send("Serwer TransferRoomAI działa i połączył się z bazą danych");
+});
 
-  const scriptPath = path.join(__dirname, "../scripts/test_data.py");
+app.get("/api/players", (req, res) => {
+  let sql = `
+        SELECT 
+            player, nation, team, league,
+            SUM(Performance_Gls) as Performance_Gls,
+            ROUND(SUM(Expected_xG), 2) as Expected_xG,
+            ROUND(SUM(Performance_Gls) - SUM(Expected_xG), 2) as xG_Diff
+        FROM players_stats 
+        WHERE 1=1 
+    `;
 
-  const pythonProcess = spawn("python", [scriptPath, team, year]);
-
-  let dataBuffer = "";
-
-  pythonProcess.stdout.on("data", (data) => {
-    dataBuffer += data.toString();
-  });
-
-  pythonProcess.stderr.on("data", (data) => {
-    console.error(`Python Error: ${data}`);
-  });
-
-  pythonProcess.on("close", (code) => {
-    if (code !== 0) {
-      return res.status(500).json({ error: "Błąd skryptu Python" });
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      console.error(err.message);
+      res.status(500).json({ error: err.message });
+      return;
     }
-
-    try {
-      const parsedData = JSON.parse(dataBuffer);
-      res.json(parsedData);
-    } catch (e) {
-      res
-        .status(500)
-        .json({ error: "Błąd parsowania danych z Pythona", raw: dataBuffer });
-    }
+    res.json({
+      count: rows.length,
+      players: rows,
+    });
   });
 });
 
 app.listen(PORT, () => {
-  console.log("Server is running on http://localhost:" + PORT);
+  console.log(`Server running on http://localhost:${PORT}`);
 });

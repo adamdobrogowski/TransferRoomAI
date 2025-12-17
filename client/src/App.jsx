@@ -1,60 +1,110 @@
-import { useState } from "react";
-import "./App.css";
+import React, { useEffect, useState } from "react";
+import { use } from "react";
 
 function App() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setData(null);
+  useEffect(() => {
+    console.log("Fetching player data...");
 
-    try {
-      const response = await fetch(
-        "http://localhost:5000/api/test-python?team=Arsenal&year=2024/25"
-      );
-      const result = await response.json();
-      setData(result);
-    } catch (error) {
-      console.error("Błąd podczas pobierania danych:", error);
-      alert("Wystąpił błąd podczas pobierania danych z serwera.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    fetch("http://localhost:5000/api/players")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Błąd sieci: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        setPlayers(data.players);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, []);
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Panel Skautingu</h1>
+    <div style={{ padding: "20px", fontFamily: "sans-serif" }}>
+      <header style={{ marginBottom: "20px" }}>
+        <h1>⚽ TransferRoomAI</h1>
+        <p>Top 50 Strzelców (Sezon 2024/2025 i 2025/2026)</p>
+      </header>
 
-      <button onClick={fetchData} disabled={loading}>
-        {loading ? "Ładowanie..." : "Pobierz dane"}
-      </button>
+      {loading && <h3>⏳ Ładowanie danych z bazy...</h3>}
 
-      {data && (
-        <div
-          style={{
-            marginTop: "20px",
-            border: "1px solid #ccc",
-            padding: "10px",
-          }}
-        >
-          <h2>Klub: {data.club}</h2>
-          <p>Sezon: {data.season}</p>
+      {error && (
+        <div style={{ color: "red", border: "1px solid red", padding: "10px" }}>
+          ❌ {error}
+        </div>
+      )}
 
-          <h3>Strzelcy:</h3>
-          <ul>
-            {data.top_scorers &&
-              data.top_scorers.map((player, index) => (
-                <li key={index}>
-                  <strong>{player.name}</strong>: {player.goals} goli
-                </li>
+      {!loading && !error && (
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              border: "1px solid #ddd",
+            }}
+          >
+            <thead>
+              <tr style={{ backgroundColor: "#f2f2f2", textAlign: "left" }}>
+                <th style={styles.th}>#</th>
+                <th style={styles.th}>Zawodnik</th>
+                <th style={styles.th}>Kraj</th>
+                <th style={styles.th}>Klub</th>
+                <th style={styles.th}>Liga</th>
+                <th style={styles.th}>Gole</th>
+                <th style={styles.th}>xG</th>
+                <th style={styles.th}>Różnica</th>
+              </tr>
+            </thead>
+            <tbody>
+              {players.map((player, index) => (
+                <tr key={index} style={{ borderBottom: "1px solid #ddd" }}>
+                  <td style={styles.td}>{index + 1}</td>
+                  <td style={styles.td}>
+                    <strong>{player.player}</strong>
+                  </td>
+                  <td style={styles.td}>{player.nation}</td>
+                  <td style={styles.td}>{player.team}</td>
+                  <td style={styles.td}>{player.league}</td>
+                  <td style={{ ...styles.td, fontWeight: "bold" }}>
+                    {player.Performance_Gls}
+                  </td>
+                  <td style={styles.td}>{player.Expected_xG}</td>
+
+                  <td
+                    style={{
+                      ...styles.td,
+                      fontWeight: "bold",
+                      color:
+                        player.xG_Diff > 0
+                          ? "green"
+                          : player.xG_Diff < 0
+                          ? "red"
+                          : "black",
+                    }}
+                  >
+                    {player.xG_Diff > 0 ? "+" : ""}
+                    {player.xG_Diff}
+                  </td>
+                </tr>
               ))}
-          </ul>
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   );
 }
+
+const styles = {
+  th: { padding: "12px", borderBottom: "2px solid #ddd" },
+  td: { padding: "10px" },
+};
 
 export default App;
