@@ -46,6 +46,8 @@ app.get("/api/players", (req, res) => {
   });
 });
 
+app.get("/api");
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
